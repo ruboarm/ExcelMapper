@@ -837,7 +837,15 @@ namespace Ganss.Excel
         /// Fetches the names of all sheets.
         /// </summary>
         /// <returns>The sheet names.</returns>
-        public IEnumerable<string> FetchSheetNames() => Workbook == null ? Array.Empty<string>() : Enumerable.Range(0, Workbook.NumberOfSheets).Select(i => Workbook.GetSheetName(i));
+        public IEnumerable<string> FetchSheetNames() => FetchSheetNames(ignoreHidden: false);
+
+        /// <summary>
+        /// Fetches the names of all sheets.
+        /// </summary>
+        /// <param name="ignoreHidden">Indicates if hidden sheets should be ignored.</param>
+        /// <returns>The sheet names.</returns>
+        public IEnumerable<string> FetchSheetNames(bool ignoreHidden) => Workbook == null ? Array.Empty<string>()
+            : Enumerable.Range(0, Workbook.NumberOfSheets).Where(i => !ignoreHidden || !Workbook.IsSheetHidden(i)).Select(i => Workbook.GetSheetName(i));
 
         static async Task<Stream> ReadAsync(string file)
         {
@@ -1491,7 +1499,8 @@ namespace Ganss.Excel
                 case CellType.Boolean:
                     return cell.BooleanCellValue;
                 case CellType.Error:
-                    return cell.ErrorCellValue;
+                    var targetType = targetColumn.PropertyType;
+                    return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
                 case CellType.Unknown:
                 case CellType.Blank:
                 case CellType.String:
@@ -1731,7 +1740,7 @@ namespace Ganss.Excel
             NormalizeName = normalizeName;
         }
 
-        internal static readonly Regex ColumnLetterRegex = new("^$?[A-Z]+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        internal static readonly Regex ColumnLetterRegex = new("^\\$?[A-Z]+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
         /// <summary>
         /// Converts Excel column letters to column indexes (e.g. "A" yields 1).

@@ -983,6 +983,19 @@ namespace Ganss.Excel.Tests
         }
 
         [Test]
+        public void FetchSheetNamesHiddenTest()
+        {
+            var excel = new ExcelMapper(@"../../../xlsx/ProductsHidden.xlsx");
+            var sheetNames = excel.FetchSheetNames(ignoreHidden: true).ToList();
+
+            CollectionAssert.AreEqual(new List<string>
+            {
+                "Tabelle2",
+                "Tabelle3",
+            }, sheetNames);
+        }
+
+        [Test]
         public void FetchSheetNamesEmptyTest()
         {
             var excel = new ExcelMapper();
@@ -1979,7 +1992,9 @@ namespace Ganss.Excel.Tests
         public void LetterConversionTest()
         {
             Assert.AreEqual(1, ExcelMapper.LetterToIndex("A"));
+            Assert.AreEqual(1, ExcelMapper.LetterToIndex("$A"));
             Assert.AreEqual(649, ExcelMapper.LetterToIndex("XY"));
+            Assert.AreEqual(649, ExcelMapper.LetterToIndex("$XY"));
             Assert.AreEqual(649, ExcelMapper.LetterToIndex("xy"));
             Assert.AreEqual("AB", ExcelMapper.IndexToLetter(28));
             Assert.AreEqual("A", ExcelMapper.IndexToLetter(1));
@@ -1987,6 +2002,7 @@ namespace Ganss.Excel.Tests
 
             Assert.Throws<ArgumentException>(() => ExcelMapper.LetterToIndex(null));
             Assert.Throws<ArgumentException>(() => ExcelMapper.LetterToIndex("???"));
+            Assert.Throws<ArgumentException>(() => ExcelMapper.LetterToIndex("A$"));
             Assert.Throws<ArgumentException>(() => ExcelMapper.IndexToLetter(-1));
         }
 
@@ -2705,6 +2721,16 @@ namespace Ganss.Excel.Tests
             CollectionAssert.AreEqual(products, productsFetched);
         }
 
+        [Test]
+        public void EnumTestException()
+        {
+            var excel = new ExcelMapper("../../../xlsx/ProductsExceptionEnum.xlsx");
+            var exception = Assert.Throws<ExcelMapperConvertException > (() => excel.Fetch<EnumProduct>().ToList());
+
+            Assert.AreEqual(@"Unable to convert ""FilinchenError"" from [L:1]:[C:0] to Ganss.Excel.Tests.Tests+NameEnum.", exception.Message);
+            Assert.AreEqual("Did not find a matching enum name.", exception.InnerException.Message);
+        }
+
         private record BytesData
         {
             public byte[] TextData1 { get; set; }
@@ -3038,6 +3064,49 @@ namespace Ganss.Excel.Tests
                 Assert.Null(firstException);
                 Assert.AreEqual(0, failures);
             }
+        }
+
+        record DateTimeOffsetProduct(DateTimeOffset OfferEnd);
+
+        [Test]
+        public void DateTimeOffsetTest()
+        {
+            var products = new ExcelMapper(@"../../../xlsx/Products.xlsx").Fetch<DateTimeOffsetProduct>().ToList();
+
+            void AssertProducts(IEnumerable<DateTimeOffsetProduct> products)
+            {
+                CollectionAssert.AreEqual(new List<DateTimeOffsetProduct>
+                {
+                    new DateTimeOffsetProduct(new DateTime(1970, 01, 01)),
+                    new DateTimeOffsetProduct(new DateTime(2015, 12, 31)),
+                    new DateTimeOffsetProduct(new DateTime(1970, 01, 01)),
+                }, products);
+            }
+
+            AssertProducts(products);
+
+            var file = "DateTimeOffsetProducts.xlsx";
+
+            new ExcelMapper().Save(file, products);
+
+            var savedProducts = new ExcelMapper(file).Fetch<DateTimeOffsetProduct>().ToList();
+
+            AssertProducts(savedProducts);
+        }
+
+        record Customer(int Id, string Phone);
+
+        [Test]
+        public void ErrorTest()
+        {
+            var customers = new ExcelMapper(@"../../../xlsx/Error.xlsx").Fetch<Customer>().ToList();
+
+            CollectionAssert.AreEqual(new List<Customer>
+            {
+                new Customer(1, "3001333"),
+                new Customer(2, null),
+                new Customer(3, "10031"),
+            }, customers);
         }
     }
 }
